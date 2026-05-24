@@ -1,6 +1,6 @@
 'use client';
 
-import { button, useControls } from 'leva';
+import { button, Leva, useControls } from 'leva';
 import { fuelControls, fuelSim } from '@/lib/fuelControls';
 
 export function FuelControlsPanel() {
@@ -82,5 +82,12 @@ function Panel() {
     calm: button(() => fuelSim.calm()),
   });
 
-  return null;
+  return (
+    <Leva
+      collapsed={false}
+      hidden={false}
+      oneLineLabels
+      titleBar={{ title: 'Liquid tuning', filter: false }}
+    />
+  );
 }
