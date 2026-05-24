@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { fuelControls, fuelSim } from '@/lib/fuelControls';
 
 const MAX_FUEL = 30;
 const TANK_W = 280;
@@ -8,15 +9,6 @@ const TANK_H = 480;
 const TANK_RADIUS = 28;
 const INNER_PAD = 14;
 const SURFACE_POINTS = 56;
-
-const TENSION = 0.025;
-const DAMPING = 0.025;
-const SPREAD = 0.25;
-const PASSES = 6;
-
-const SPLASH_GAIN = 0.012;
-const SPLASH_MAX = 8;
-const SPLASH_RADIUS = 5;
 
 export function FuelSlider() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -66,15 +58,21 @@ export function FuelSlider() {
     };
 
     const splash = (centerX: number, impulse: number) => {
+      const radius = Math.max(1, Math.round(fuelControls.splashRadius));
       const colF = ((centerX - innerLeft) / innerW) * (SURFACE_POINTS - 1);
       const v = vRef.current;
       const c = Math.round(colF);
-      for (let i = c - SPLASH_RADIUS; i <= c + SPLASH_RADIUS; i++) {
+      for (let i = c - radius; i <= c + radius; i++) {
         if (i < 0 || i >= SURFACE_POINTS) continue;
-        const d = (i - colF) / SPLASH_RADIUS;
+        const d = (i - colF) / radius;
         const w = Math.exp(-d * d * 3);
         v[i] += impulse * w;
       }
+    };
+
+    fuelSim.calm = () => {
+      yRef.current.fill(0);
+      vRef.current.fill(0);
     };
 
     function step() {
@@ -105,21 +103,25 @@ export function FuelSlider() {
         const v = vRef.current;
         const lDelta = lDeltaRef.current;
         const rDelta = rDeltaRef.current;
+        const tension = fuelControls.tension;
+        const damping = fuelControls.damping;
+        const spread = fuelControls.spread;
+        const passes = Math.max(0, Math.round(fuelControls.passes));
 
         for (let i = 0; i < SURFACE_POINTS; i++) {
-          const force = TENSION * y[i] + DAMPING * v[i];
+          const force = tension * y[i] + damping * v[i];
           v[i] -= force * scale;
           y[i] += v[i] * scale;
         }
 
-        for (let pass = 0; pass < PASSES; pass++) {
+        for (let pass = 0; pass < passes; pass++) {
           for (let i = 0; i < SURFACE_POINTS; i++) {
             if (i > 0) {
-              lDelta[i] = SPREAD * (y[i] - y[i - 1]);
+              lDelta[i] = spread * (y[i] - y[i - 1]);
               v[i - 1] += lDelta[i] * scale;
             }
             if (i < SURFACE_POINTS - 1) {
-              rDelta[i] = SPREAD * (y[i] - y[i + 1]);
+              rDelta[i] = spread * (y[i] - y[i + 1]);
               v[i + 1] += rDelta[i] * scale;
             }
           }
@@ -238,7 +240,8 @@ export function FuelSlider() {
       // Pointer moving up (vy < 0) raises rest → splash should push surface
       // down to amplify lag, so flip sign.
       const impulse =
-        -Math.sign(vy) * Math.min(SPLASH_MAX, Math.abs(vy) * SPLASH_GAIN);
+        -Math.sign(vy) *
+        Math.min(fuelControls.splashMax, Math.abs(vy) * fuelControls.splashGain);
       if (Math.abs(impulse) > 0.05) splash(localX, impulse);
 
       lastPointerYRef.current = e.clientY;
